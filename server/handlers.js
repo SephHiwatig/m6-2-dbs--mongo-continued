@@ -37,7 +37,8 @@ const getSeats = async (req, res) => {
 };
 
 const bookSeat = async (req, res) => {
-  const { seatId, creditCard, expiration } = req.body;
+  console.log(req.body);
+  const { seatId, creditCard, expiration, fullName, email } = req.body;
 
   const client = await MongoClient(MONGO_URI, options);
 
@@ -64,20 +65,24 @@ const bookSeat = async (req, res) => {
 
   await db
     .collection("seats")
-    .updateOne({ _id: seatId }, { $set: { isBooked: true } }, (err, result) => {
-      if (err) {
-        res.status(500).json({
-          message:
-            "An unknown error has occurred. Please try your request again.",
-        });
-      } else {
-        res.status(200).json({
-          status: 200,
-          success: true,
-        });
+    .updateOne(
+      { _id: seatId },
+      { $set: { isBooked: true, bookedBy: fullName, email } },
+      (err, result) => {
+        if (err) {
+          res.status(500).json({
+            message:
+              "An unknown error has occurred. Please try your request again.",
+          });
+        } else {
+          res.status(200).json({
+            status: 200,
+            success: true,
+          });
+        }
+        client.close();
       }
-      client.close();
-    });
+    );
 };
 
 module.exports = { getSeats, bookSeat };
