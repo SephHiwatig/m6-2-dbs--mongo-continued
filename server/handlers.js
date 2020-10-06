@@ -21,11 +21,6 @@ const getSeats = async (req, res) => {
 
   client.close();
 
-  if (!state) {
-    state = {
-      bookedSeats: randomlyBookSeats(30),
-    };
-  }
   const seatObj = {};
   seats.forEach((seat) => {
     seatObj[seat._id] = {
@@ -36,35 +31,53 @@ const getSeats = async (req, res) => {
 
   return res.json({
     seats: seatObj,
-    bookedSeats: state.bookedSeats,
     numOfRows: 8,
     seatsPerRow: 12,
   });
 };
 
-//////// HELPERS
-const NUM_OF_ROWS = 8;
-const SEATS_PER_ROW = 12;
+const bookSeat = async (req, res) => {
+  const { seatId, creditCard, expiration } = req.body;
 
-const getRowName = (rowIndex) => {
-  return String.fromCharCode(65 + rowIndex);
-};
+  const client = await MongoClient(MONGO_URI, options);
 
-const randomlyBookSeats = (num) => {
-  const bookedSeats = {};
+  await client.connect();
 
-  while (num > 0) {
-    const row = Math.floor(Math.random() * NUM_OF_ROWS);
-    const seat = Math.floor(Math.random() * SEATS_PER_ROW);
+  const db = client.db("ticket");
 
-    const seatId = `${getRowName(row)}-${seat + 1}`;
+  const seat = await db.collection("seats").findOne({ _id: seatId });
 
-    bookedSeats[seatId] = true;
-
-    num--;
+  if (seat.isBooked) {
+    client.close();
+    return res.status(400).json({
+      message: "This seat has already been booked!",
+    });
   }
 
-  return bookedSeats;
+  if (!creditCard || !expiration) {
+    client.close();
+    return res.status(400).json({
+      status: 400,
+      message: "Please provide credit card information!",
+    });
+  }
+
+  await db
+    .collection("seats")
+    .updateOne({ _id: seatId }, { $set: { isBooked: true } }, (err, result) => {
+      if (err) {
+        res.status(500).json({
+          message:
+            "An unknown error has occurred. Please try your request again.",
+        });
+      } else {
+        res.status(200).json({
+          status: 200,
+          success: true,
+        });
+      }
+      client.close();
+    });
 };
 
-module.exports = { getSeats };
+module.exports = { getSeats, bookSeat };
